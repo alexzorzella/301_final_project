@@ -24,7 +24,7 @@
 // Port guide:
 // Water Sensor: A0 (PF0)
 // LCD: 53 (lcd_RS), 51 (lcd_EN), 49 (lcd_D4), 47 (lcd_D5), 45 (lcd_D6), 43 (lcd_D7)
-// Power Button: A8 (PK0)
+// Power Button: 2 (PE4)
 // LEDs: 21 (PD0: Red), 20 (PD1: Yellow), 19 (PD2: Green), and 18 (PD3: Blue)
 // Fan: 8 (PH5)
 // Stepper Motor: 6 (PH3), 7 (PH4)
@@ -50,9 +50,9 @@ volatile unsigned char* ddr_d  = (unsigned char*) 0x2A;
 volatile unsigned char* pin_d  = (unsigned char*) 0x29;
 
 // Button Management (Button functionality is achieved by using attachInterrupt(...))
-volatile unsigned char* port_k = (unsigned char*) 0x108;
-volatile unsigned char* ddr_k  = (unsigned char*) 0x107;
-volatile unsigned char* pin_k  = (unsigned char*) 0x106;
+volatile unsigned char* port_e = (unsigned char*) 0x108;
+volatile unsigned char* ddr_e  = (unsigned char*) 0x107;
+volatile unsigned char* pin_e  = (unsigned char*) 0x106;
 
 // Fan and Stepper Motor Management
 volatile unsigned char* port_h = (unsigned char*) 0x102;
@@ -97,7 +97,7 @@ void loop() {
 /*
  Button Management
 */
-void refreshButtonState() {
+void toggleSystemEngaged() {
   systemEngaged = !systemEngaged;
 }
 
@@ -110,9 +110,11 @@ void initializePins() {
   // Port(s):   8,   7,   6
   *ddr_h |= 0x11100
   
-  // Sets  PK0 to input
-  // Port(s):  A8
-  *ddr_k &= (0x1);
+  // Sets  PE4 to input
+  // Port(s):  2
+  *ddr_e &= (0x1000);
+  
+  attachInterrupt(digitalPinToInterrupt(2), toggleSystemEngaged, RISING);
 }
 
 /*
@@ -135,10 +137,6 @@ void manageLEDs() {
 /*
  LCD Management
 */
-
-// LCD pin connections
-// These ports are reserved for the LCD
-// Port(s): 53, 51, 49, 47, 45, and 43
 const int RS = 53, EN = 51, D4 = 49, D5 = 47, D6 = 45, D7 = 43;
 
 LiquidCrystal lcd(RS, EN, D4, D5, D6, D7);

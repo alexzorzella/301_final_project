@@ -21,6 +21,14 @@
 #define RDA 0x80
 #define TBE 0x20
 
+// Port guide:
+// Water Sensor: A0 (PF0)
+// LCD: 53 (lcd_RS), 51 (lcd_EN), 49 (lcd_D4), 47 (lcd_D5), 45 (lcd_D6), 43 (lcd_D7)
+// Power Button: A8 (PK0)
+// LEDs: 21 (PD0: Red), 20 (PD1: Yellow), 19 (PD2: Green), and 18 (PD3: Blue)
+// Fan: 8 (PH5)
+// Stepper Motor: 6 (PH3), 7 (PH4)
+
 // UART Pointers for using the Serial Monitor
 volatile unsigned char *myUCSR0A = (unsigned char *)0x00C0;
 volatile unsigned char *myUCSR0B = (unsigned char *)0x00C1;
@@ -37,14 +45,19 @@ volatile unsigned int* my_ADC_DATA = (unsigned int*) 0x78;
 // LED Management
 int currentLED = 0;
 
+volatile unsigned char* port_d = (unsigned char*) 0x2B;
+volatile unsigned char* ddr_d  = (unsigned char*) 0x2A;
+volatile unsigned char* pin_d  = (unsigned char*) 0x29;
+
+// Button Management (Button functionality is achieved by using attachInterrupt(...))
 volatile unsigned char* port_k = (unsigned char*) 0x108;
 volatile unsigned char* ddr_k  = (unsigned char*) 0x107;
 volatile unsigned char* pin_k  = (unsigned char*) 0x106;
 
-// Button Management
-volatile unsigned char* port_d = (unsigned char*) 0x2B;
-volatile unsigned char* ddr_d  = (unsigned char*) 0x2A;
-volatile unsigned char* pin_d  = (unsigned char*) 0x29;
+// Fan and Stepper Motor Management
+volatile unsigned char* port_h = (unsigned char*) 0x102;
+volatile unsigned char* ddr_h  = (unsigned char*) 0x101;
+volatile unsigned char* pin_h  = (unsigned char*) 0x100;
 
 // Data
 bool systemEngaged = false;
@@ -63,12 +76,12 @@ bool waterLevelOK() {
   return waterLevel >= waterLevelThreshold;
 }
 
-unsigned int humidity = 70; // I think this will be relative humidity
+unsigned int humidity = 70;
 
 void setup() {
   U0Init(9600);
   adc_init();
-  initalizeLEDs();
+  initializePins();
 }
 
 void loop() {
@@ -88,29 +101,29 @@ void refreshButtonState() {
   systemEngaged = !systemEngaged;
 }
 
+void initializePins() {
+  // Sets     PD0, PD1, PD2, and PD3 to output
+  // Port(s):  21,  20,  19, and  18 to output
+  *ddr_d |= 0x1111
+  
+  // Sets     PH5, PH4, PH3
+  // Port(s):   8,   7,   6
+  *ddr_h |= 0x11100
+  
+  // Sets  PK0 to input
+  // Port(s):  A8
+  *ddr_k &= (0x1);
+}
+
 /*
  LED Management
 */
-void initializeLEDs() {
-  // Sets   PK0, PK1, and PK2 to output
-  // Ports:  A8,  A9, and A10 to output
-  *ddr_k |= 0x111
-  
-  // *ddr_k |= (0x1);
-  // *ddr_k |= (0x1 << 1);
-  // *ddr_k |= (0x1 << 2);
-
-  // Sets  PD0 to input
-  // Port:  21
-  *ddr_d &= (0x1);
-}
-
 void setCurrentLED(int newLED) {
   currentLED = newLED;
 }
 
 void manageLEDs() {
-  for(int i = 0; i < 3; i++) {
+  for(int i = 0; i < 4; i++) {
     if(i == currentLED) {
       // Turn it on
     } else {
@@ -125,7 +138,8 @@ void manageLEDs() {
 
 // LCD pin connections
 // These ports are reserved for the LCD
-const int RS = 11, EN = 12, D4 = 2, D5 = 3, D6 = 4, D7 = 5;
+// Port(s): 53, 51, 49, 47, 45, and 43
+const int RS = 53, EN = 51, D4 = 49, D5 = 47, D6 = 45, D7 = 43;
 
 LiquidCrystal lcd(RS, EN, D4, D5, D6, D7);
 

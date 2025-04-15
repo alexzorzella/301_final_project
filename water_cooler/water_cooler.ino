@@ -104,11 +104,11 @@ void toggleSystemEngaged() {
 void initializePins() {
   // Sets     PD0, PD1, PD2, and PD3 to output
   // Port(s):  21,  20,  19, and  18 to output
-  *ddr_d |= 0x1111
+  *ddr_d |= 0x1111;
   
   // Sets     PH5, PH4, PH3
   // Port(s):   8,   7,   6
-  *ddr_h |= 0x11100
+  *ddr_h |= 0x11100;
   
   // Sets  PE4 to input
   // Port(s):  2
@@ -162,9 +162,9 @@ void updateLCD() {
   lcd.begin(0, 0);
 
   if(waterLevelOK()) {
-    lcd.print("Temp: " + to_string(temp) + " F");
+    lcd.print("Temp: " + String(temp) + " F");
     lcd.begin(0, 1);
-    lcd.print("Hum: " + to_string(humidity) + " RH");
+    lcd.print("Hum: " + String(humidity) + " RH");
   } else {
     lcd.print("Water level");
     lcd.begin(0, 1);

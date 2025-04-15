@@ -41,6 +41,11 @@ volatile unsigned char* port_k = (unsigned char*) 0x108;
 volatile unsigned char* ddr_k  = (unsigned char*) 0x107;
 volatile unsigned char* pin_k  = (unsigned char*) 0x106;
 
+// Button Management
+volatile unsigned char* port_d = (unsigned char*) 0x2B;
+volatile unsigned char* ddr_d  = (unsigned char*) 0x2A;
+volatile unsigned char* pin_d  = (unsigned char*) 0x29;
+
 // Data
 bool systemEngaged = false;
 
@@ -63,6 +68,7 @@ unsigned int humidity = 70; // I think this will be relative humidity
 void setup() {
   U0Init(9600);
   adc_init();
+  initalizeLEDs();
 }
 
 void loop() {
@@ -76,14 +82,27 @@ void loop() {
 }
 
 /*
+ Button Management
+*/
+void refreshButtonState() {
+  systemEngaged = !systemEngaged;
+}
+
+/*
  LED Management
 */
 void initializeLEDs() {
   // Sets   PK0, PK1, and PK2 to output
   // Ports:  A8,  A9, and A10 to output
-  *ddr_k &= (0x1);
-  *ddr_k &= (0x1 << 1);
-  *ddr_k &= (0x1 << 2);
+  *ddr_k |= 0x111
+  
+  // *ddr_k |= (0x1);
+  // *ddr_k |= (0x1 << 1);
+  // *ddr_k |= (0x1 << 2);
+
+  // Sets  PD0 to input
+  // Port:  21
+  *ddr_d &= (0x1);
 }
 
 void setCurrentLED(int newLED) {
@@ -125,11 +144,20 @@ void updateLCDClock() {
 
 void updateLCD() {
   // Updates the LCD to display the current air temperature and humidity
+  // If the water level is too low, the display reflects that
   lcd.clear();
+
   lcd.begin(0, 0);
-  lcd.print("Temp: 37 F");
-  lcd.begin(0, 1);
-  lcd.print("Hum: 72 RH");
+
+  if(waterLevelOK()) {
+    lcd.print("Temp: " + to_string(temp) + " F");
+    lcd.begin(0, 1);
+    lcd.print("Hum: " + to_string(humidity) + " RH");
+  } else {
+    lcd.print("Water level");
+    lcd.begin(0, 1);
+    lcd.print("is too low.");
+  }
 }
 
 /*

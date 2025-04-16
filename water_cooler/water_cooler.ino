@@ -15,6 +15,7 @@
 // * If the water level is too low, there should be an error message, and the red LED should be on
 
 // Datasheet: https://ww1.microchip.com/downloads/en/DeviceDoc/Atmel-2549-8-bit-AVR-Microcontroller-ATmega640-1280-1281-2560-2561_datasheet.pdf
+// DHT Library: https://github.com/RobTillaart/DHTlib/blob/master/examples/dht11_test/dht11_test.ino
 
 #include <LiquidCrystal.h>
 
@@ -128,8 +129,9 @@ void manageLEDs() {
   for(int i = 0; i < 4; i++) {
     if(i == currentLED) {
       // Turn it on
+      *port_d |= (0x1 << i);
     } else {
-      // Turn it off
+      *port_d &= ~(0x1 << i);
     }
   }
 }
@@ -150,7 +152,7 @@ void updateLCDClock() {
   if (currentMillis - previousMillis >= interval) {
     previousMillis = currentMillis;
 
-    void updateLCD();
+    updateLCD();
   }
 }
 
@@ -234,8 +236,8 @@ unsigned int adc_read(unsigned char adc_channel_num) {
 void readSensorData() {
   // read the water sensor value by calling adc_read() and check the threshold to display the message accordingly
   waterLevel = adc_read(0); // Water level day may need to be processed, check below for what was done in lab
-  temp = adc_read(1); // Both temp and humidity might need to be adjusted as adc_read(...) is from the water level lab
-  humidity = adc_read(2);
+  // temp = adc_read(1); // Both temp and humidity might need to be adjusted as adc_read(...) is from the water level lab
+  // humidity = adc_read(2);
 
   //if the value is less than the threshold display the value on the Serial monitor
   // if(SensorVal < waterLevelThreshold){

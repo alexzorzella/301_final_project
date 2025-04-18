@@ -32,39 +32,38 @@
 // Stepper Motor: 6 (PH3), 7 (PH4)
 
 // UART Pointers for using the Serial Monitor
-volatile unsigned char *myUCSR0A = (unsigned char *)0x00C0;
-volatile unsigned char *myUCSR0B = (unsigned char *)0x00C1;
-volatile unsigned char *myUCSR0C = (unsigned char *)0x00C2;
-volatile unsigned int  *myUBRR0  = (unsigned int *) 0x00C4;
-volatile unsigned char *myUDR0   = (unsigned char *)0x00C6;
+volatile unsigned char* myUCSR0A = (unsigned char*)0x00C0;
+volatile unsigned char* myUCSR0B = (unsigned char*)0x00C1;
+volatile unsigned char* myUCSR0C = (unsigned char*)0x00C2;
+volatile unsigned int* myUBRR0 = (unsigned int*)0x00C4;
+volatile unsigned char* myUDR0 = (unsigned char*)0x00C6;
 
 // Water Level Sensor Pointers
-volatile unsigned char* my_ADMUX = (unsigned char*) 0x7C;
-volatile unsigned char* my_ADCSRB = (unsigned char*) 0x7B;
-volatile unsigned char* my_ADCSRA = (unsigned char*) 0x7A;
-volatile unsigned int* my_ADC_DATA = (unsigned int*) 0x78;
+volatile unsigned char* my_ADMUX = (unsigned char*)0x7C;
+volatile unsigned char* my_ADCSRB = (unsigned char*)0x7B;
+volatile unsigned char* my_ADCSRA = (unsigned char*)0x7A;
+volatile unsigned int* my_ADC_DATA = (unsigned int*)0x78;
 
 dht DHT;
 
 #define DHT11_PIN 2
 
 // LED Management
-volatile unsigned char* port_d = (unsigned char*) 0x2B;
-volatile unsigned char* ddr_d  = (unsigned char*) 0x2A;
-volatile unsigned char* pin_d  = (unsigned char*) 0x29;
+volatile unsigned char* port_d = (unsigned char*)0x2B;
+volatile unsigned char* ddr_d = (unsigned char*)0x2A;
+volatile unsigned char* pin_d = (unsigned char*)0x29;
 
 // Button Management (Button functionality is achieved by using attachInterrupt(...))
-volatile unsigned char* port_e = (unsigned char*) 0x108;
-volatile unsigned char* ddr_e  = (unsigned char*) 0x107;
-volatile unsigned char* pin_e  = (unsigned char*) 0x106;
+volatile unsigned char* port_e = (unsigned char*)0x108;
+volatile unsigned char* ddr_e = (unsigned char*)0x107;
+volatile unsigned char* pin_e = (unsigned char*)0x106;
 
 // Fan and Stepper Motor Management
-volatile unsigned char* port_h = (unsigned char*) 0x102;
-volatile unsigned char* ddr_h  = (unsigned char*) 0x101;
-volatile unsigned char* pin_h  = (unsigned char*) 0x100;
+volatile unsigned char* port_h = (unsigned char*)0x102;
+volatile unsigned char* ddr_h = (unsigned char*)0x101;
+volatile unsigned char* pin_h = (unsigned char*)0x100;
 
 // Data
-// bool systemEngaged = false;
 unsigned int currentState = 0;
 // 0: Disabled
 // 1: Idle
@@ -72,14 +71,21 @@ unsigned int currentState = 0;
 // 3: Error
 
 unsigned int temp = 80;
-const unsigned int tempThreshold = 90; // Update this value
+const unsigned int tempThreshold = 90;  // Update this value
+
+/*
+ LCD Management
+*/
+const int RS = 53, EN = 51, D4 = 49, D5 = 47, D6 = 45, D7 = 43;
+
+LiquidCrystal lcd(RS, EN, D4, D5, D6, D7);
 
 bool tempOK() {
   return temp <= tempThreshold;
 }
 
 unsigned int waterLevel = 100;
-const unsigned int waterLevelThreshold = 255; // Update this value
+const unsigned int waterLevelThreshold = 90;  // Update this value
 
 bool waterLevelOK() {
   return waterLevel >= waterLevelThreshold;
@@ -87,10 +93,37 @@ bool waterLevelOK() {
 
 unsigned int humidity = 70;
 
+void updateLCD() {
+  // Updates the LCD to display the current air temperature and humidity
+  // If the water level is too low, the display reflects that
+  lcd.clear();
+  lcd.setCursor(0, 0);
+
+  if(currentState == 0) {
+    lcd.print("System Disabled");
+  } else if (waterLevelOK()) {
+    lcd.print("Temp: " + String(temp) + " F ");
+    lcd.setCursor(0, 1);
+    lcd.print("Hum: " + String(humidity) + " RH");
+  } else {
+    lcd.print("Water level");
+    lcd.setCursor(0, 1);
+    lcd.print("is too low.");
+  }
+}
+
 void setup() {
   U0Init(9600);
   adc_init();
   initializePins();
+
+  lcd.clear();
+  lcd.begin(16, 2);
+
+  updateLCD();
+
+  // lcd.setCursor(0, 1);
+  // lcd.print("Amy??");
 }
 
 void loop() {
@@ -101,24 +134,26 @@ void loop() {
 }
 
 void updateStateMachine() {
-  switch(currentState) {
-    case 0: // Disabled
+  switch (currentState) {
+    case 0:  // Disabled
+      // The only way to leave the disabled state is to press the button
       break;
-    case 1: // Idle
-      if(!waterLevelOK()) {
+    case 1:  // Idle
+      if (!waterLevelOK()) {
         currentState = 3;
-      } else if(!tempOK()) {
+      } else if (!tempOK()) {
         currentState = 2;
       }
       break;
-    case 2: // Running
-      if(!waterLevelOK()) {
+    case 2:  // Running
+      if (!waterLevelOK()) {
         currentState = 3;
-      } else if(tempOK()) {
+      } else if (tempOK()) {
         currentState = 1;
       }
       break;
-    case 3: // Error
+    case 3:  // Error
+      // The only way to leave the error state is to press the button
       break;
     default:
       break;
@@ -126,20 +161,19 @@ void updateStateMachine() {
 }
 
 void updateFunctionality() {
-  switch(currentState) {
-    case 0: // Disabled
-      // The only way to leave the disabled state is to press the button
+  switch (currentState) {
+    case 0:  // Disabled
       break;
-    case 1: // Idle
+    case 1:  // Idle
       updateLCDClock();
       readSensorData();
       break;
-    case 2: // Running
+    case 2:  // Running
       updateLCDClock();
       readSensorData();
       break;
-    case 3: // Error
-      // The only way to leave the error state is to press the button
+    case 3:  // Error
+      updateLCDClock();
       break;
     default:
       break;
@@ -150,28 +184,39 @@ void updateFunctionality() {
  Button Management
 */
 void toggleSystemEngaged() {
-  if(currentState == 0) { // Disabled -> Idle
+  // currentState++;
+
+  // if(currentState > 3) {
+  //   currentState = 0;
+  // }
+
+  if (currentState == 0) {  // Disabled -> Idle
     currentState = 1;
-  } else if(currentState == 3) { // Error -> Idle
+  } else if (currentState == 3) {  // Error -> Idle
     currentState = 1;
-  } else { // Any other state -> Disabled
+  } else {  // Any other state -> Disabled
     currentState = 0;
   }
+
+  updateLCD();
+
+  unsigned char Monitor[] = "0123";
+  putChar(Monitor[currentState]);
 }
 
 void initializePins() {
   // Sets     PD0, PD1, PD2, and PD3 to output
   // Port(s):  21,  20,  19, and  18 to output
   *ddr_d |= 0x1111;
-  
-  // Sets     PH5, PH4, PH3
+
+  // Sets     PH5, PH4, PH3, port 17 is used in place of 20 because 20 outputs bad data
   // Port(s):   8,   7,   6
-  *ddr_h |= 0x11100;
-  
+  *ddr_h |= 0x11101;
+
   // Sets  PE4 to input
   // Port(s):  2
   *ddr_e &= (0x1000);
-  
+
   attachInterrupt(digitalPinToInterrupt(2), toggleSystemEngaged, RISING);
 }
 
@@ -179,22 +224,24 @@ void initializePins() {
  LED Management
 */
 void manageLEDs() {
-  for(int i = 0; i < 4; i++) {
-    if(i == currentState) {
+  for (int i = 0; i < 4; i++) {
+    if (i == currentState) {
       // Turn it on
-      *port_d |= (0x1 << i);
+      if(i == 1) {
+        *port_h |= (0x1);
+      } else {
+        *port_d |= (0x1 << i);
+      }
     } else {
-      *port_d &= ~(0x1 << i);
+      // Turn it off
+      if(i == 1) {
+        *port_h &= 0x11110;
+      } else {
+        *port_d &= ~(0x1 << i);
+      }
     }
   }
 }
-
-/*
- LCD Management
-*/
-const int RS = 53, EN = 51, D4 = 49, D5 = 47, D6 = 45, D7 = 43;
-
-LiquidCrystal lcd(RS, EN, D4, D5, D6, D7);
 
 unsigned long previousMillis = 0;
 const long interval = 60000;
@@ -209,36 +256,18 @@ void updateLCDClock() {
   }
 }
 
-void updateLCD() {
-  // Updates the LCD to display the current air temperature and humidity
-  // If the water level is too low, the display reflects that
-  lcd.clear();
-
-  lcd.begin(0, 0);
-
-  if(waterLevelOK()) {
-    lcd.print("Temp: " + String(temp) + " F");
-    lcd.begin(0, 1);
-    lcd.print("Hum: " + String(humidity) + " RH");
-  } else {
-    lcd.print("Water level");
-    lcd.begin(0, 1);
-    lcd.print("is too low.");
-  }
-}
-
 /*
   Water Level Sensor Management
 */
-void adc_init() { //write your code after each commented line and follow the instruction
+void adc_init() {  //write your code after each commented line and follow the instruction
   // setup the A register
- // set bit   7 to 1 to enable the ADC
+  // set bit   7 to 1 to enable the ADC
   *my_ADCSRA |= (1 << 7);
- // clear bit 6 to 0 to disable the ADC trigger mode
+  // clear bit 6 to 0 to disable the ADC trigger mode
   *my_ADCSRA &= ~(1 << 6);
- // clear bit 5 to 0 to disable the ADC interrupt
+  // clear bit 5 to 0 to disable the ADC interrupt
   *my_ADCSRA &= ~(1 << 5);
- // clear bit 0-2 to 0 to set prescaler selection to slow reading
+  // clear bit 0-2 to 0 to set prescaler selection to slow reading
   *my_ADCSRA &= ~0x07;
 
   // setup the B register
@@ -265,19 +294,20 @@ unsigned int adc_read(unsigned char adc_channel_num) {
 
   // clear the channel selection bits (MUX 5) hint: it's not in the ADMUX register
   //MUX5 in ADCRSB register
-  *my_ADCSRB &= ~(1 << 3); //MUX5 is bit 3 (this took too long to find)
+  *my_ADCSRB &= ~(1 << 3);  //MUX5 is bit 3 (this took too long to find)
 
   // set the channel selection bits for channel 0
-  *my_ADMUX |= (adc_channel_num & 0x1F); 
+  *my_ADMUX |= (adc_channel_num & 0x1F);
   //set channel selection bits to the 5 lowerbits of adc_channel_number
 
   // set bit 6 of ADCSRA to 1 to start a conversion
   *my_ADCSRA |= (1 << 6);
 
   // wait for the conversion to complete
-  while((*my_ADCSRA & 0x40) != 0);
+  while ((*my_ADCSRA & 0x40) != 0)
+    ;
   // return the result in the ADC data register and format the data based on right justification (check the lecture slide)
-  
+
   unsigned int val = *my_ADC_DATA;
   return val;
 }
@@ -288,7 +318,14 @@ unsigned int adc_read(unsigned char adc_channel_num) {
 // * Humidity sensor
 void readSensorData() {
   // read the water sensor value by calling adc_read() and check the threshold to display the message accordingly
-  waterLevel = adc_read(0); // Water level day may need to be processed, check below for what was done in lab
+  
+  waterLevel = 100;
+  temp = 60;
+  humidity = 70;
+
+  return;
+  
+  waterLevel = adc_read(0);  // Water level day may need to be processed, check below for what was done in lab
 
   int chk = DHT.read11(DHT11_PIN);
 
@@ -297,9 +334,9 @@ void readSensorData() {
       temp = DHT.temperature;
       humidity = DHT.humidity;
       break;
-    case DHTLIB_ERROR_CHECKSUM: 
+    case DHTLIB_ERROR_CHECKSUM:
       break;
-    case DHTLIB_ERROR_TIMEOUT: 
+    case DHTLIB_ERROR_TIMEOUT:
       break;
     case DHTLIB_ERROR_CONNECT:
       break;
@@ -307,64 +344,35 @@ void readSensorData() {
       break;
     case DHTLIB_ERROR_ACK_H:
       break;
-    default: 
-    break;
+    default:
+      break;
   }
-
-  // DISPLAY DATA
-  // Serial.print(DHT.humidity, 1);
-  // Serial.print(",\t");
-  // Serial.println(DHT.temperature, 1);
-
-  // temp = adc_read(1); // Both temp and humidity might need to be adjusted as adc_read(...) is from the water level lab
-  // humidity = adc_read(2);
-
-  //if the value is less than the threshold display the value on the Serial monitor
-  // if(SensorVal < waterLevelThreshold){
-    // unsigned char digits[3];
-    // digits[0] = (SensorVal/100)%10;
-    // digits[1] = (SensorVal/10)%10;
-    // digits[2] = SensorVal%10;
-
-    // for(int i = 0; i < 3; i++){
-    //   U0putchar(digits[i]+48); //add 48 to convert to ASCII, otherwise it will display []
-    // }
-    // U0putchar('\n');
-  // }
-  //if the value is over the threshold display "Water Level: High" message on the Serial monitor.
-  // else{
-    // unsigned char Alert[] = "Water Level: High";
-    // for(int i = 0; i < 17; i++){
-    //   U0putchar(Alert[i]);
-    // }
-    // U0putchar('\n');
-  // }
-  //Use a threshold value that works for you with your sensor. There is no fixed value as sensor's sensitivity can differ.
 }
 
 /*
  * UART FUNCTIONS
  */
 void U0Init(int U0baud) {
-    unsigned long FCPU = 16000000;
-    unsigned int tbaud;
-    tbaud = (FCPU / 16 / U0baud - 1);
-    // Same as (FCPU / (16 * U0baud)) - 1;
-    *myUCSR0A = 0x20;
-    *myUCSR0B = 0x18;
-    *myUCSR0C = 0x06;
-    *myUBRR0  = tbaud;
+  unsigned long FCPU = 16000000;
+  unsigned int tbaud;
+  tbaud = (FCPU / 16 / U0baud - 1);
+  // Same as (FCPU / (16 * U0baud)) - 1;
+  *myUCSR0A = 0x20;
+  *myUCSR0B = 0x18;
+  *myUCSR0C = 0x06;
+  *myUBRR0 = tbaud;
 }
 
 unsigned char kbhit() {
-   return *myUCSR0A & RDA;
+  return *myUCSR0A & RDA;
 }
 
 unsigned char getChar() {
-   return *myUDR0;
+  return *myUDR0;
 }
 
 void putChar(unsigned char U0pdata) {
-  while((*myUCSR0A & TBE)==0);
-    *myUDR0 = U0pdata;
+  while ((*myUCSR0A & TBE) == 0)
+    ;
+  *myUDR0 = U0pdata;
 }

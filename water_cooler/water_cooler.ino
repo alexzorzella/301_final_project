@@ -18,6 +18,7 @@
 // DHT Library: https://github.com/RobTillaart/DHTlib/blob/master/examples/dht11_test/dht11_test.ino
 
 #include <LiquidCrystal.h>
+#include <dht.h>
 
 #define RDA 0x80
 #define TBE 0x20
@@ -26,7 +27,7 @@
 // Water Sensor: A0 (PF0)
 // LCD: 53 (lcd_RS), 51 (lcd_EN), 49 (lcd_D4), 47 (lcd_D5), 45 (lcd_D6), 43 (lcd_D7)
 // Power Button: 2 (PE4)
-// LEDs: 21 (PD0: Red), 20 (PD1: Yellow), 19 (PD2: Green), and 18 (PD3: Blue)
+// LEDs: 21 (PD0: Yellow), 20 (PD1: Green), 19 (PD2: Blue), and 18 (PD3: Red)
 // Fan: 8 (PH5)
 // Stepper Motor: 6 (PH3), 7 (PH4)
 
@@ -43,9 +44,11 @@ volatile unsigned char* my_ADCSRB = (unsigned char*) 0x7B;
 volatile unsigned char* my_ADCSRA = (unsigned char*) 0x7A;
 volatile unsigned int* my_ADC_DATA = (unsigned int*) 0x78;
 
-// LED Management
-int currentLED = 0;
+dht DHT;
 
+#define DHT11_PIN 2
+
+// LED Management
 volatile unsigned char* port_d = (unsigned char*) 0x2B;
 volatile unsigned char* ddr_d  = (unsigned char*) 0x2A;
 volatile unsigned char* pin_d  = (unsigned char*) 0x29;
@@ -61,7 +64,12 @@ volatile unsigned char* ddr_h  = (unsigned char*) 0x101;
 volatile unsigned char* pin_h  = (unsigned char*) 0x100;
 
 // Data
-bool systemEngaged = false;
+// bool systemEngaged = false;
+unsigned int currentState = 0;
+// 0: Disabled
+// 1: Idle
+// 2: Running
+// 3: Error
 
 unsigned int temp = 80;
 const unsigned int tempThreshold = 90; // Update this value
@@ -88,10 +96,53 @@ void setup() {
 void loop() {
   manageLEDs();
 
-  // There should be an interrupt for the button that turns the system on and off
-  if(systemEngaged) {
-    updateLCDClock();
-    readSensorData();
+  updateStateMachine();
+  updateFunctionality();
+}
+
+void updateStateMachine() {
+  switch(currentState) {
+    case 0: // Disabled
+      break;
+    case 1: // Idle
+      if(!waterLevelOK()) {
+        currentState = 3;
+      } else if(!tempOK()) {
+        currentState = 2;
+      }
+      break;
+    case 2: // Running
+      if(!waterLevelOK()) {
+        currentState = 3;
+      } else if(tempOK()) {
+        currentState = 1;
+      }
+      break;
+    case 3: // Error
+      break;
+    default:
+      break;
+  }
+}
+
+void updateFunctionality() {
+  switch(currentState) {
+    case 0: // Disabled
+      // The only way to leave the disabled state is to press the button
+      break;
+    case 1: // Idle
+      updateLCDClock();
+      readSensorData();
+      break;
+    case 2: // Running
+      updateLCDClock();
+      readSensorData();
+      break;
+    case 3: // Error
+      // The only way to leave the error state is to press the button
+      break;
+    default:
+      break;
   }
 }
 
@@ -99,7 +150,13 @@ void loop() {
  Button Management
 */
 void toggleSystemEngaged() {
-  systemEngaged = !systemEngaged;
+  if(currentState == 0) { // Disabled -> Idle
+    currentState = 1;
+  } else if(currentState == 3) { // Error -> Idle
+    currentState = 1;
+  } else { // Any other state -> Disabled
+    currentState = 0;
+  }
 }
 
 void initializePins() {
@@ -121,13 +178,9 @@ void initializePins() {
 /*
  LED Management
 */
-void setCurrentLED(int newLED) {
-  currentLED = newLED;
-}
-
 void manageLEDs() {
   for(int i = 0; i < 4; i++) {
-    if(i == currentLED) {
+    if(i == currentState) {
       // Turn it on
       *port_d |= (0x1 << i);
     } else {
@@ -236,6 +289,33 @@ unsigned int adc_read(unsigned char adc_channel_num) {
 void readSensorData() {
   // read the water sensor value by calling adc_read() and check the threshold to display the message accordingly
   waterLevel = adc_read(0); // Water level day may need to be processed, check below for what was done in lab
+
+  int chk = DHT.read11(DHT11_PIN);
+
+  switch (chk) {
+    case DHTLIB_OK:
+      temp = DHT.temperature;
+      humidity = DHT.humidity;
+      break;
+    case DHTLIB_ERROR_CHECKSUM: 
+      break;
+    case DHTLIB_ERROR_TIMEOUT: 
+      break;
+    case DHTLIB_ERROR_CONNECT:
+      break;
+    case DHTLIB_ERROR_ACK_L:
+      break;
+    case DHTLIB_ERROR_ACK_H:
+      break;
+    default: 
+    break;
+  }
+
+  // DISPLAY DATA
+  // Serial.print(DHT.humidity, 1);
+  // Serial.print(",\t");
+  // Serial.println(DHT.temperature, 1);
+
   // temp = adc_read(1); // Both temp and humidity might need to be adjusted as adc_read(...) is from the water level lab
   // humidity = adc_read(2);
 

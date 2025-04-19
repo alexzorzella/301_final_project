@@ -65,6 +65,7 @@ volatile unsigned char* pin_h = (unsigned char*)0x100;
 
 // Data
 unsigned int currentState = 0;
+unsigned int lastState = 0;
 // 0: Disabled
 // 1: Idle
 // 2: Running
@@ -85,7 +86,7 @@ bool tempOK() {
 }
 
 unsigned int waterLevel = 100;
-const unsigned int waterLevelThreshold = 90;  // Update this value
+const unsigned int waterLevelThreshold = 10;  // Update this value
 
 bool waterLevelOK() {
   return waterLevel >= waterLevelThreshold;
@@ -100,15 +101,15 @@ void updateLCD() {
   lcd.setCursor(0, 0);
 
   if(currentState == 0) {
-    lcd.print("System Disabled");
+    lcd.print("System Disabled.");
   } else if (waterLevelOK()) {
-    lcd.print("Temp: " + String(temp) + " C");
+    lcd.print("Temp: " + String(temp) + " C W" + String(waterLevel));
     lcd.setCursor(0, 1);
     lcd.print("Hum: " + String(humidity) + "% RH");
   } else {
     lcd.print("Water level");
     lcd.setCursor(0, 1);
-    lcd.print("is too low.");
+    lcd.print("is too low. " + String(waterLevel));
   }
 }
 
@@ -140,22 +141,18 @@ void updateStateMachine() {
 }
 
 void updateFunctionality() {
-  switch (currentState) {
-    case 0:  // Disabled
-      break;
-    case 1:  // Idle
-      updateLCDClock();
-      readSensorData();
-      break;
-    case 2:  // Running
-      updateLCDClock();
-      readSensorData();
-      break;
-    case 3:  // Error
-      updateLCDClock();
-      break;
-    default:
-      break;
+  readSensorData();
+
+  if(lastState != currentState) {
+    lastState = currentState;
+
+    if(currentState == 3) {
+      updateLCD();
+    }
+  }
+
+  if(currentState == 1 || currentState == 2) {
+    updateLCDClock();
   }
 }
 
@@ -298,7 +295,7 @@ unsigned int adc_read(unsigned char adc_channel_num) {
 void readSensorData() {
   // read the water sensor value by calling adc_read() and check the threshold to display the message accordingly
   
-  waterLevel = 100;
+  waterLevel = adc_read(0);
 
   int chk = DHT.read11(DHT11_PIN);
 
@@ -321,10 +318,6 @@ void readSensorData() {
 
   temp = DHT.temperature;
   humidity = DHT.humidity;
-
-  return;
-
-  waterLevel = adc_read(0);  // Water level day may need to be processed, check below for what was done in lab
 }
 
 /*

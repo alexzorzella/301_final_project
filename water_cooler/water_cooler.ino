@@ -46,7 +46,7 @@ volatile unsigned int* my_ADC_DATA = (unsigned int*)0x78;
 
 dht DHT;
 
-#define DHT11_PIN 2
+#define DHT11_PIN 4
 
 // LED Management
 volatile unsigned char* port_d = (unsigned char*)0x2B;
@@ -70,7 +70,7 @@ unsigned int currentState = 0;
 // 2: Running
 // 3: Error
 
-unsigned int temp = 80;
+unsigned int temp = 25;
 const unsigned int tempThreshold = 90;  // Update this value
 
 /*
@@ -91,7 +91,7 @@ bool waterLevelOK() {
   return waterLevel >= waterLevelThreshold;
 }
 
-unsigned int humidity = 70;
+unsigned int humidity = 25;
 
 void updateLCD() {
   // Updates the LCD to display the current air temperature and humidity
@@ -102,35 +102,14 @@ void updateLCD() {
   if(currentState == 0) {
     lcd.print("System Disabled");
   } else if (waterLevelOK()) {
-    lcd.print("Temp: " + String(temp) + " F ");
+    lcd.print("Temp: " + String(temp) + " C");
     lcd.setCursor(0, 1);
-    lcd.print("Hum: " + String(humidity) + " RH");
+    lcd.print("Hum: " + String(humidity) + "% RH");
   } else {
     lcd.print("Water level");
     lcd.setCursor(0, 1);
     lcd.print("is too low.");
   }
-}
-
-void setup() {
-  U0Init(9600);
-  adc_init();
-  initializePins();
-
-  lcd.clear();
-  lcd.begin(16, 2);
-
-  updateLCD();
-
-  // lcd.setCursor(0, 1);
-  // lcd.print("Amy??");
-}
-
-void loop() {
-  manageLEDs();
-
-  updateStateMachine();
-  updateFunctionality();
 }
 
 void updateStateMachine() {
@@ -320,19 +299,11 @@ void readSensorData() {
   // read the water sensor value by calling adc_read() and check the threshold to display the message accordingly
   
   waterLevel = 100;
-  temp = 60;
-  humidity = 70;
-
-  return;
-  
-  waterLevel = adc_read(0);  // Water level day may need to be processed, check below for what was done in lab
 
   int chk = DHT.read11(DHT11_PIN);
 
   switch (chk) {
     case DHTLIB_OK:
-      temp = DHT.temperature;
-      humidity = DHT.humidity;
       break;
     case DHTLIB_ERROR_CHECKSUM:
       break;
@@ -347,6 +318,13 @@ void readSensorData() {
     default:
       break;
   }
+
+  temp = DHT.temperature;
+  humidity = DHT.humidity;
+
+  return;
+
+  waterLevel = adc_read(0);  // Water level day may need to be processed, check below for what was done in lab
 }
 
 /*
@@ -375,4 +353,26 @@ void putChar(unsigned char U0pdata) {
   while ((*myUCSR0A & TBE) == 0)
     ;
   *myUDR0 = U0pdata;
+}
+
+void setup() {
+  U0Init(9600);
+  adc_init();
+  initializePins();
+
+  lcd.clear();
+  lcd.begin(16, 2);
+
+  readSensorData();
+  updateLCD();
+
+  // lcd.setCursor(0, 1);
+  // lcd.print("Amy??");
+}
+
+void loop() {
+  manageLEDs();
+
+  updateStateMachine();
+  updateFunctionality();
 }

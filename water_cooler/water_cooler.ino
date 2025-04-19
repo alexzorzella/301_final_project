@@ -74,7 +74,7 @@ unsigned int lastState = 0;
 // 3: Error
 
 unsigned int temp = 25;
-const unsigned int tempThreshold = 20;  // Update this value
+const unsigned int tempThreshold = 25;  // Update this value
 
 /*
  LCD Management
@@ -185,7 +185,10 @@ void toggleSystemEngaged() {
 void initializePins() {
   // Sets     PD0, PD1, PD2, and PD3 to output
   // Port(s):  21,  20,  19, and  18 to output
-  *ddr_d |= 0x1111;
+  *ddr_d |= 0x1;
+  *ddr_d |= BIT(1);
+  *ddr_d |= BIT(2);
+  *ddr_d |= BIT(3);
 
   // Sets     PH5, PH4, PH3, PH0 (port 17) is used in place of 20 because 20 outputs bad data
   // Port(s):   8,   7,   6
@@ -194,40 +197,26 @@ void initializePins() {
 
   // Sets  PE4 to input
   // Port(s):  2
-  *ddr_e &= (0x1000);
+  *ddr_e &= BIT(4);
 
   attachInterrupt(digitalPinToInterrupt(2), toggleSystemEngaged, RISING);
 }
 
 void manageOutput() {
-  if(currentState == 2) {
-    *port_h |= BIT(4);
-  } else {
-    *port_h &= ~BIT(4);
-  }
-
   for (int i = 0; i < 4; i++) {
     if (i == currentState) {
       // Turn it on
-      if(i == 1) {
-        *port_h |= 0x1;
-      } else {
-        *port_d |= (0x1 << i);
-      }
+      *port_d |= BIT(i);
     } else {
-      // Turn it off
-      if(i == 1) {
-        *port_h &= 0x1110;
-      } else {
-        *port_d &= ~(0x1 << i);
-      }
+      // Turn it off{
+      *port_d &= ~BIT(i);
     }
   }
 
   if(currentState == 2) {
-      *port_h |= 0x1000;
+    *port_h |= BIT(4);
   } else {
-      *port_h &= 0x0111;
+    *port_h &= ~BIT(4);
   }
 }
 

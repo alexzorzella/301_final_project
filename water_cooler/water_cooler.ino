@@ -23,6 +23,8 @@
 #define RDA 0x80
 #define TBE 0x20
 
+#define BIT(x) (1 << (x))
+
 // Port guide:
 // Water Sensor: A0 (PF0)
 // LCD: 53 (lcd_RS), 51 (lcd_EN), 49 (lcd_D4), 47 (lcd_D5), 45 (lcd_D6), 43 (lcd_D7)
@@ -185,9 +187,10 @@ void initializePins() {
   // Port(s):  21,  20,  19, and  18 to output
   *ddr_d |= 0x1111;
 
-  // Sets     PH5, PH4, PH3, port 17 is used in place of 20 because 20 outputs bad data
+  // Sets     PH5, PH4, PH3, PH0 (port 17) is used in place of 20 because 20 outputs bad data
   // Port(s):   8,   7,   6
-  *ddr_h |= 0x11101;
+  *ddr_h |= 0x1;
+  *ddr_h |= BIT(4);
 
   // Sets  PE4 to input
   // Port(s):  2
@@ -198,9 +201,9 @@ void initializePins() {
 
 void manageOutput() {
   if(currentState == 2) {
-      *port_h |= 0x10000;
+    *port_h |= BIT(4);
   } else {
-      *port_h &= 0x01111;
+    *port_h &= ~BIT(4);
   }
 
   for (int i = 0; i < 4; i++) {
@@ -214,11 +217,17 @@ void manageOutput() {
     } else {
       // Turn it off
       if(i == 1) {
-        *port_h &= 0x11110;
+        *port_h &= 0x1110;
       } else {
         *port_d &= ~(0x1 << i);
       }
     }
+  }
+
+  if(currentState == 2) {
+      *port_h |= 0x1000;
+  } else {
+      *port_h &= 0x0111;
   }
 }
 

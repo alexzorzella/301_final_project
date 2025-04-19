@@ -28,8 +28,8 @@
 // LCD: 53 (lcd_RS), 51 (lcd_EN), 49 (lcd_D4), 47 (lcd_D5), 45 (lcd_D6), 43 (lcd_D7)
 // Power Button: 2 (PE4)
 // LEDs: 21 (PD0: Yellow), 20 (PD1: Green), 19 (PD2: Blue), and 18 (PD3: Red)
-// Fan: 8 (PH5)
-// Stepper Motor: 6 (PH3), 7 (PH4)
+// Fan: 6 (PH3), 7 (PH4)
+// Stepper Motor: 8 (PH5)
 
 // UART Pointers for using the Serial Monitor
 volatile unsigned char* myUCSR0A = (unsigned char*)0x00C0;
@@ -72,7 +72,7 @@ unsigned int lastState = 0;
 // 3: Error
 
 unsigned int temp = 25;
-const unsigned int tempThreshold = 90;  // Update this value
+const unsigned int tempThreshold = 20;  // Update this value
 
 /*
  LCD Management
@@ -86,7 +86,7 @@ bool tempOK() {
 }
 
 unsigned int waterLevel = 100;
-const unsigned int waterLevelThreshold = 10;  // Update this value
+const unsigned int waterLevelThreshold = 150;  // Update this value
 
 bool waterLevelOK() {
   return waterLevel >= waterLevelThreshold;
@@ -196,15 +196,18 @@ void initializePins() {
   attachInterrupt(digitalPinToInterrupt(2), toggleSystemEngaged, RISING);
 }
 
-/*
- LED Management
-*/
-void manageLEDs() {
+void manageOutput() {
+  if(currentState == 2) {
+      *port_h |= 0x10000;
+  } else {
+      *port_h &= 0x01111;
+  }
+
   for (int i = 0; i < 4; i++) {
     if (i == currentState) {
       // Turn it on
       if(i == 1) {
-        *port_h |= (0x1);
+        *port_h |= 0x1;
       } else {
         *port_d |= (0x1 << i);
       }
@@ -364,7 +367,7 @@ void setup() {
 }
 
 void loop() {
-  manageLEDs();
+  manageOutput();
 
   updateStateMachine();
   updateFunctionality();

@@ -19,6 +19,7 @@
 
 #include <LiquidCrystal.h>
 #include <dht.h>
+#include <uRTCLib.h>
 
 #define RDA 0x80
 #define TBE 0x20
@@ -51,9 +52,9 @@ dht DHT;
 #define DHT11_PIN 4
 
 // LED Management
-volatile unsigned char* port_d = (unsigned char*)0x2B;
-volatile unsigned char* ddr_d = (unsigned char*)0x2A;
-volatile unsigned char* pin_d = (unsigned char*)0x29;
+volatile unsigned char* port_b = (unsigned char*)0x25;
+volatile unsigned char* ddr_b = (unsigned char*)0x24;
+volatile unsigned char* pin_b = (unsigned char*)0x23;
 
 // Button Management (Button functionality is achieved by using attachInterrupt(...))
 volatile unsigned char* port_e = (unsigned char*)0x108;
@@ -65,6 +66,11 @@ volatile unsigned char* port_h = (unsigned char*)0x102;
 volatile unsigned char* ddr_h = (unsigned char*)0x101;
 volatile unsigned char* pin_h = (unsigned char*)0x100;
 
+// Stepper Motor Button Management
+volatile unsigned char* port_d = (unsigned char*)0x2B;
+volatile unsigned char* ddr_d = (unsigned char*)0x2A;
+volatile unsigned char* pin_d = (unsigned char*)0x29;
+
 // Data
 unsigned int currentState = 0;
 unsigned int lastState = 0;
@@ -73,8 +79,15 @@ unsigned int lastState = 0;
 // 2: Running
 // 3: Error
 
+const char* stateNames[4] = { "Disa", "Idle", "Runn", "Erro" };
+
+uRTCLib rtc(0x68);
+
 unsigned int temp = 25;
-const unsigned int tempThreshold = 25;  // Update this value
+const unsigned int tempThreshold = 20;  // Update this value
+
+const unsigned int angleStep = 10;
+int angle = 0;
 
 /*
  LCD Management
@@ -142,6 +155,18 @@ void updateStateMachine() {
   }
 }
 
+void printDateTime() {
+  rtc.refresh();
+
+   String finalMessage = "\nState Updated To " + String(stateNames[currentState]) + "\n" +
+                  String(rtc.year()) + "/" + String(rtc.month()) + "/" + String(rtc.day()) + "\n" +
+                  String(rtc.hour()) + ":" + String(rtc.minute()) + ":" + String(rtc.second()) + "\n";
+
+  for(int i = 0; i < 39; i++) {
+    putChar(finalMessage[i]);
+  }
+}
+
 void updateFunctionality() {
   readSensorData();
 
@@ -151,6 +176,8 @@ void updateFunctionality() {
     if(currentState == 3) {
       updateLCD();
     }
+
+    printDateTime();
   }
 
   if(currentState == 1 || currentState == 2) {
@@ -179,20 +206,33 @@ void toggleSystemEngaged() {
   updateLCD();
 
   unsigned char Monitor[] = "0123";
-  putChar(Monitor[currentState]);
+  // putChar(Monitor[currentState]);
+}
+
+void adjustAngleLeft() {
+  angle += angleStep;
+}
+
+void adjustAngleRight() {
+  angle -= angleStep;
 }
 
 void initializePins() {
-  // Sets     PD0, PD1, PD2, and PD3 to output
-  // Port(s):  21,  20,  19, and  18 to output
-  *ddr_d |= 0x1;
-  *ddr_d |= BIT(1);
-  *ddr_d |= BIT(2);
-  *ddr_d |= BIT(3);
+  // Sets     PB5, PB6, PB7, and PB8 to output
+  // Port(s):  10,  11,  12, and  13 to output
+  *ddr_b |= BIT(4);
+  *ddr_b |= BIT(5);
+  *ddr_b |= BIT(6);
+  *ddr_b |= BIT(7);
 
-  // Sets     PH5, PH4, PH3, PH0 (port 17) is used in place of 20 because 20 outputs bad data
+  // Sets     PD0, PD1 to output
+  // Port(s):  21, 20 to output
+  *ddr_d |= BIT(0);
+  *ddr_d |= BIT(1);
+
+  // Sets     PH5, PH4, PH3, PH0 (port 17)
   // Port(s):   8,   7,   6
-  *ddr_h |= 0x1;
+  *ddr_h |= BIT(0);
   *ddr_h |= BIT(4);
 
   // Sets  PE4 to input
@@ -200,23 +240,25 @@ void initializePins() {
   *ddr_e &= BIT(4);
 
   attachInterrupt(digitalPinToInterrupt(2), toggleSystemEngaged, RISING);
+  attachInterrupt(digitalPinToInterrupt(19), toggleSystemEngaged, RISING);
+  attachInterrupt(digitalPinToInterrupt(18), toggleSystemEngaged, RISING);
 }
 
 void manageOutput() {
   for (int i = 0; i < 4; i++) {
     if (i == currentState) {
       // Turn it on
-      *port_d |= BIT(i);
+      *port_b |= BIT(i + 4);
     } else {
       // Turn it off{
-      *port_d &= ~BIT(i);
+      *port_b &= ~BIT(i + 4);
     }
   }
 
   if(currentState == 2) {
-    *port_h |= BIT(4);
+    *port_h |= BIT(5);
   } else {
-    *port_h &= ~BIT(4);
+    *port_h &= ~BIT(5);
   }
 }
 
@@ -359,6 +401,8 @@ void setup() {
 
   readSensorData();
   updateLCD();
+
+  URTCLIB_WIRE.begin();
 
   // lcd.setCursor(0, 1);
   // lcd.print("Amy??");

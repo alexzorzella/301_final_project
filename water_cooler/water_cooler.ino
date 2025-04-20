@@ -4,7 +4,6 @@
 #include <LiquidCrystal.h>
 #include <dht.h>
 #include <uRTCLib.h>
-#include <Stepper.h>
 #include <AccelStepper.h>
 
 #define RDA 0x80
@@ -172,11 +171,9 @@ void updateFunctionality() {
     if(stepperKnob > 500 && stepperMode != 2) {
       stepperMode = 2;
       stepper.moveTo(-150);
-      // stepperMotorRight();
     } else if(stepperKnob < 100 && stepperMode != 1) {
       stepperMode = 1;
       stepper.moveTo(150);
-      // stepperMotorLeft();
     } else if(stepperMode != 0) {
       stepperMode = 0;
     }
@@ -193,12 +190,6 @@ void updateFunctionality() {
  Button Management
 */
 void toggleSystemEngaged() {
-  // currentState++;
-
-  // if(currentState > 3) {
-  //   currentState = 0;
-  // }
-
   if (currentState == 0) {  // Disabled -> Idle
     currentState = 1;
   } else if (currentState == 3) {  // Error -> Idle
@@ -210,21 +201,10 @@ void toggleSystemEngaged() {
   updateLCD();
 
   unsigned char Monitor[] = "0123";
-  // putChar(Monitor[currentState]);
 }
 
 unsigned int foo = 0;
 unsigned int fooLast = 0;
-
-// void stepperMotorRight() {
-//   stepper.setSpeed(stepSpeed);
-//   stepper.step(stepsPerRevolution);
-// }
-
-// void stepperMotorLeft() {
-//   stepper.setSpeed(stepSpeed);
-//   stepper.step(stepsPerRevolution * -1);
-// }
 
 void initializePins() {
   // Sets     PB5, PB6, PB7, and PB8 to output
@@ -343,13 +323,7 @@ unsigned int adc_read(unsigned char adc_channel_num) {
   return val;
 }
 
-// Reads the data from the
-// * Water level sensor
-// * Thermometer
-// * Humidity sensor
 void readSensorData() {
-  // read the water sensor value by calling adc_read() and check the threshold to display the message accordingly
-  
   waterLevel = adc_read(0);
 
   int chk = DHT.read11(DHT11_PIN);
@@ -415,8 +389,6 @@ void setup() {
   updateLCD();
 
   URTCLIB_WIRE.begin();
-
-  Serial.begin(9600);
 
   stepper.setMaxSpeed(1000.0);
 	stepper.setAcceleration(50.0);

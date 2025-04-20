@@ -5,6 +5,7 @@
 #include <dht.h>
 #include <uRTCLib.h>
 #include <Stepper.h>
+#include <AccelStepper.h>
 
 #define RDA 0x80
 #define TBE 0x20
@@ -71,7 +72,7 @@ unsigned int stepperMode = 0;
 const unsigned int stepSpeed = 30;
 const int stepsPerRevolution = 100;
 
-Stepper stepper = Stepper(stepsPerRevolution, 29, 27, 25, 23);
+AccelStepper stepper(AccelStepper::FULL4WIRE, 29, 25, 27, 23);
 
 /*
  LCD Management
@@ -105,7 +106,7 @@ void updateLCD() {
   if(currentState == 0) {
     lcd.print("System Disabled.");
   } else if (waterLevelOK()) {
-    lcd.print("Temp: " + String(temp) + " C " + String(stepperKnob)); // String(waterLevel));
+    lcd.print("Temp: " + String(temp) + " C");
     lcd.setCursor(0, 1);
     lcd.print("Hum: " + String(humidity) + "% RH");
   } else {
@@ -170,14 +171,18 @@ void updateFunctionality() {
 
     if(stepperKnob > 500 && stepperMode != 2) {
       stepperMode = 2;
-      stepperMotorRight();
+      stepper.moveTo(-150);
+      // stepperMotorRight();
     } else if(stepperKnob < 100 && stepperMode != 1) {
       stepperMode = 1;
-      stepperMotorLeft();
+      stepper.moveTo(150);
+      // stepperMotorLeft();
     } else if(stepperMode != 0) {
       stepperMode = 0;
     }
   }
+
+  stepper.run();
 
   if(currentState == 1 || currentState == 2) {
     updateLCDClock();
@@ -211,15 +216,15 @@ void toggleSystemEngaged() {
 unsigned int foo = 0;
 unsigned int fooLast = 0;
 
-void stepperMotorRight() {
-  stepper.setSpeed(stepSpeed);
-  stepper.step(stepsPerRevolution);
-}
+// void stepperMotorRight() {
+//   stepper.setSpeed(stepSpeed);
+//   stepper.step(stepsPerRevolution);
+// }
 
-void stepperMotorLeft() {
-  stepper.setSpeed(stepSpeed);
-  stepper.step(stepsPerRevolution * -1);
-}
+// void stepperMotorLeft() {
+//   stepper.setSpeed(stepSpeed);
+//   stepper.step(stepsPerRevolution * -1);
+// }
 
 void initializePins() {
   // Sets     PB5, PB6, PB7, and PB8 to output
@@ -412,6 +417,11 @@ void setup() {
   URTCLIB_WIRE.begin();
 
   Serial.begin(9600);
+
+  stepper.setMaxSpeed(1000.0);
+	stepper.setAcceleration(50.0);
+	stepper.setSpeed(200);
+  stepper.moveTo(0);
 }
 
 void loop() {

@@ -65,8 +65,11 @@ const char* stateNames[4] = { "Disa", "Idle", "Runn", "Erro" };
 
 uRTCLib rtc(0x68);
 
-const unsigned int stepSpeed = 5;
-const unsigned int stepsPerRevolution = 2048;
+unsigned int stepperKnob = 0;
+unsigned int stepperMode = 0;
+
+const unsigned int stepSpeed = 30;
+const int stepsPerRevolution = 100;
 
 Stepper stepper = Stepper(stepsPerRevolution, 29, 27, 25, 23);
 
@@ -102,7 +105,7 @@ void updateLCD() {
   if(currentState == 0) {
     lcd.print("System Disabled.");
   } else if (waterLevelOK()) {
-    lcd.print("Temp: " + String(temp) + " C"); // String(waterLevel));
+    lcd.print("Temp: " + String(temp) + " C " + String(stepperKnob)); // String(waterLevel));
     lcd.setCursor(0, 1);
     lcd.print("Hum: " + String(humidity) + "% RH");
   } else {
@@ -162,6 +165,18 @@ void updateFunctionality() {
     }
 
     printDateTime();
+
+    stepperKnob = adc_read(7);
+
+    if(stepperKnob > 500 && stepperMode != 2) {
+      stepperMode = 2;
+      stepperMotorRight();
+    } else if(stepperKnob < 100 && stepperMode != 1) {
+      stepperMode = 1;
+      stepperMotorLeft();
+    } else if(stepperMode != 0) {
+      stepperMode = 0;
+    }
   }
 
   if(currentState == 1 || currentState == 2) {
@@ -197,20 +212,13 @@ unsigned int foo = 0;
 unsigned int fooLast = 0;
 
 void stepperMotorRight() {
-  foo++;
-  // putChar('r');
   stepper.setSpeed(stepSpeed);
   stepper.step(stepsPerRevolution);
 }
 
 void stepperMotorLeft() {
-  foo += 2;
-  // Serial.flush();
-  // Serial.println("Gaming2");
-
-  // putChar('l');
   stepper.setSpeed(stepSpeed);
-  stepper.step(-stepsPerRevolution);
+  stepper.step(stepsPerRevolution * -1);
 }
 
 void initializePins() {
@@ -225,9 +233,6 @@ void initializePins() {
   // Port(s):  21, 20 to output
   *ddr_d |= BIT(0);
   *ddr_d |= BIT(1);
-  
-  // *ddr_d &= ~BIT(2);
-  // *ddr_d &= ~BIT(3);
 
   // Sets     PH3, PH4, PH5
   // Port(s):   6,   7,   8
@@ -243,8 +248,6 @@ void initializePins() {
   // Port(s): A15
   *ddr_f &= ~BIT(7);
 
-  attachInterrupt(digitalPinToInterrupt(19), stepperMotorLeft, RISING);
-  attachInterrupt(digitalPinToInterrupt(18), stepperMotorRight, RISING);
   attachInterrupt(digitalPinToInterrupt(2), toggleSystemEngaged, RISING);
 }
 
@@ -344,10 +347,6 @@ void readSensorData() {
   
   waterLevel = adc_read(0);
 
-  int pOut = adc_read(7);
-
-  Serial.println(pOut);
-
   int chk = DHT.read11(DHT11_PIN);
 
   switch (chk) {
@@ -420,9 +419,4 @@ void loop() {
 
   updateStateMachine();
   updateFunctionality();
-
-  if(fooLast != foo) {
-    Serial.println("Foo changed to: " + String(foo));
-    fooLast = foo;
-  }
 }

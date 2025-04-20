@@ -1,38 +1,15 @@
-// PDF Info:
-// -Monitor the water levels in a reservoir and print an alert when the level is too low
-// -Monitor and display the current air temp and humidity on an LCD screen.
-// -Start and stop a fan motor as needed when the temperature falls out of a specifed
-// range (high or low).
-// -Allow a user to use a control to adjust the angle of an output vent from the system
-// -Allow a user to enable or disable the system using an on/off button
-// -Record the time and date every time the motor is turned on or off. This information
-// should be transmitted to a host computer (over USB)
-
-// Diagram Info:
-// * Only one LED should be on at a time
-// * When the system is disabled, the fan should be off and the yellow LED should be on
-// * If the temperature is OK and the water level is OK, the fan should be off and the green LED should be on
-// * If the water level is too low, there should be an error message, and the red LED should be on
-
 // Datasheet: https://ww1.microchip.com/downloads/en/DeviceDoc/Atmel-2549-8-bit-AVR-Microcontroller-ATmega640-1280-1281-2560-2561_datasheet.pdf
 // DHT Library: https://github.com/RobTillaart/DHTlib/blob/master/examples/dht11_test/dht11_test.ino
 
 #include <LiquidCrystal.h>
 #include <dht.h>
 #include <uRTCLib.h>
+#include <Stepper.h>
 
 #define RDA 0x80
 #define TBE 0x20
 
 #define BIT(x) (1 << (x))
-
-// Port guide:
-// Water Sensor: A0 (PF0)
-// LCD: 53 (lcd_RS), 51 (lcd_EN), 49 (lcd_D4), 47 (lcd_D5), 45 (lcd_D6), 43 (lcd_D7)
-// Power Button: 2 (PE4)
-// LEDs: 21 (PD0: Yellow), 20 (PD1: Green), 19 (PD2: Blue), and 18 (PD3: Red)
-// Fan: 6 (PH3), 7 (PH4)
-// Stepper Motor: 8 (PH5)
 
 // UART Pointers for using the Serial Monitor
 volatile unsigned char* myUCSR0A = (unsigned char*)0x00C0;
@@ -56,17 +33,22 @@ volatile unsigned char* port_b = (unsigned char*)0x25;
 volatile unsigned char* ddr_b = (unsigned char*)0x24;
 volatile unsigned char* pin_b = (unsigned char*)0x23;
 
-// Button Management (Button functionality is achieved by using attachInterrupt(...))
+// On/Off/Reset Button Management
 volatile unsigned char* port_e = (unsigned char*)0x108;
 volatile unsigned char* ddr_e = (unsigned char*)0x107;
 volatile unsigned char* pin_e = (unsigned char*)0x106;
 
-// Fan and Stepper Motor Management
+// Fan Motor Management
 volatile unsigned char* port_h = (unsigned char*)0x102;
 volatile unsigned char* ddr_h = (unsigned char*)0x101;
 volatile unsigned char* pin_h = (unsigned char*)0x100;
 
-// Stepper Motor Button Management
+// Stepper Motor Potentiometer Input Management
+volatile unsigned char* port_f = (unsigned char*)0x31;
+volatile unsigned char* ddr_f = (unsigned char*)0x30;
+volatile unsigned char* pin_f = (unsigned char*)0x2F;
+
+// RTC Input Management
 volatile unsigned char* port_d = (unsigned char*)0x2B;
 volatile unsigned char* ddr_d = (unsigned char*)0x2A;
 volatile unsigned char* pin_d = (unsigned char*)0x29;
@@ -83,11 +65,10 @@ const char* stateNames[4] = { "Disa", "Idle", "Runn", "Erro" };
 
 uRTCLib rtc(0x68);
 
-unsigned int temp = 25;
-const unsigned int tempThreshold = 20;  // Update this value
+const unsigned int stepSpeed = 5;
+const unsigned int stepsPerRevolution = 2048;
 
-const unsigned int angleStep = 10;
-int angle = 0;
+Stepper stepper = Stepper(stepsPerRevolution, 29, 27, 25, 23);
 
 /*
  LCD Management
@@ -95,6 +76,9 @@ int angle = 0;
 const int RS = 53, EN = 51, D4 = 49, D5 = 47, D6 = 45, D7 = 43;
 
 LiquidCrystal lcd(RS, EN, D4, D5, D6, D7);
+
+unsigned int temp = 25;
+const unsigned int tempThreshold = 20;  // Update this value
 
 bool tempOK() {
   return temp <= tempThreshold;
@@ -118,13 +102,13 @@ void updateLCD() {
   if(currentState == 0) {
     lcd.print("System Disabled.");
   } else if (waterLevelOK()) {
-    lcd.print("Temp: " + String(temp) + " C W" + String(waterLevel));
+    lcd.print("Temp: " + String(temp) + " C"); // String(waterLevel));
     lcd.setCursor(0, 1);
     lcd.print("Hum: " + String(humidity) + "% RH");
   } else {
     lcd.print("Water level");
     lcd.setCursor(0, 1);
-    lcd.print("is too low. " + String(waterLevel));
+    lcd.print("is too low.");
   }
 }
 
@@ -209,12 +193,24 @@ void toggleSystemEngaged() {
   // putChar(Monitor[currentState]);
 }
 
-void adjustAngleLeft() {
-  angle += angleStep;
+unsigned int foo = 0;
+unsigned int fooLast = 0;
+
+void stepperMotorRight() {
+  foo++;
+  // putChar('r');
+  stepper.setSpeed(stepSpeed);
+  stepper.step(stepsPerRevolution);
 }
 
-void adjustAngleRight() {
-  angle -= angleStep;
+void stepperMotorLeft() {
+  foo += 2;
+  // Serial.flush();
+  // Serial.println("Gaming2");
+
+  // putChar('l');
+  stepper.setSpeed(stepSpeed);
+  stepper.step(-stepsPerRevolution);
 }
 
 void initializePins() {
@@ -229,19 +225,27 @@ void initializePins() {
   // Port(s):  21, 20 to output
   *ddr_d |= BIT(0);
   *ddr_d |= BIT(1);
+  
+  // *ddr_d &= ~BIT(2);
+  // *ddr_d &= ~BIT(3);
 
-  // Sets     PH5, PH4, PH3, PH0 (port 17)
-  // Port(s):   8,   7,   6
-  *ddr_h |= BIT(0);
+  // Sets     PH3, PH4, PH5
+  // Port(s):   6,   7,   8
+  *ddr_h |= BIT(3);
   *ddr_h |= BIT(4);
+  *ddr_h |= BIT(5);
 
-  // Sets  PE4 to input
-  // Port(s):  2
-  *ddr_e &= BIT(4);
+  // Sets  PE0, PE1, PE4 to input
+  // Port(s):  0, 1, 2
+  *ddr_e &= ~BIT(4);
 
+  // Sets     PK7 to input
+  // Port(s): A15
+  *ddr_f &= ~BIT(7);
+
+  attachInterrupt(digitalPinToInterrupt(19), stepperMotorLeft, RISING);
+  attachInterrupt(digitalPinToInterrupt(18), stepperMotorRight, RISING);
   attachInterrupt(digitalPinToInterrupt(2), toggleSystemEngaged, RISING);
-  attachInterrupt(digitalPinToInterrupt(19), toggleSystemEngaged, RISING);
-  attachInterrupt(digitalPinToInterrupt(18), toggleSystemEngaged, RISING);
 }
 
 void manageOutput() {
@@ -340,6 +344,10 @@ void readSensorData() {
   
   waterLevel = adc_read(0);
 
+  int pOut = adc_read(7);
+
+  Serial.println(pOut);
+
   int chk = DHT.read11(DHT11_PIN);
 
   switch (chk) {
@@ -404,8 +412,7 @@ void setup() {
 
   URTCLIB_WIRE.begin();
 
-  // lcd.setCursor(0, 1);
-  // lcd.print("Amy??");
+  Serial.begin(9600);
 }
 
 void loop() {
@@ -413,4 +420,9 @@ void loop() {
 
   updateStateMachine();
   updateFunctionality();
+
+  if(fooLast != foo) {
+    Serial.println("Foo changed to: " + String(foo));
+    fooLast = foo;
+  }
 }

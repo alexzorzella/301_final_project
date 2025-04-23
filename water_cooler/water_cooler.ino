@@ -1,3 +1,5 @@
+// Images and Video Google Drive Link: https://drive.google.com/drive/folders/1cFaX7M_nOUcK27EAklEaLIqBZCs4sfJD?usp=sharing
+
 // Datasheet: https://ww1.microchip.com/downloads/en/DeviceDoc/Atmel-2549-8-bit-AVR-Microcontroller-ATmega640-1280-1281-2560-2561_datasheet.pdf
 // DHT Library: https://github.com/RobTillaart/DHTlib/blob/master/examples/dht11_test/dht11_test.ino
 
@@ -24,6 +26,7 @@ volatile unsigned char* my_ADCSRB = (unsigned char*)0x7B;
 volatile unsigned char* my_ADCSRA = (unsigned char*)0x7A;
 volatile unsigned int* my_ADC_DATA = (unsigned int*)0x78;
 
+// Temperature and Humidity Sensor Management
 dht DHT;
 
 #define DHT11_PIN 4
@@ -63,8 +66,10 @@ unsigned int lastState = 0;
 
 const char* stateNames[4] = { "Disa", "Idle", "Runn", "Erro" };
 
+// Real Time Clock Declaration
 uRTCLib rtc(0x68);
 
+// Stepper Motor Management
 unsigned int stepperKnob = 0;
 unsigned int stepperMode = 0;
 
@@ -73,9 +78,7 @@ const int stepsPerRevolution = 100;
 
 AccelStepper stepper(AccelStepper::FULL4WIRE, 29, 25, 27, 23);
 
-/*
- LCD Management
-*/
+// LCD Management
 const int RS = 53, EN = 51, D4 = 49, D5 = 47, D6 = 45, D7 = 43;
 
 LiquidCrystal lcd(RS, EN, D4, D5, D6, D7);
@@ -83,22 +86,26 @@ LiquidCrystal lcd(RS, EN, D4, D5, D6, D7);
 unsigned int temp = 25;
 const unsigned int tempThreshold = 20;  // Update this value
 
+// Returns whether the current temperature is less than or equal to
+// (colder or the same as) the threshold temperature
 bool tempOK() {
   return temp <= tempThreshold;
 }
 
 unsigned int waterLevel = 100;
-const unsigned int waterLevelThreshold = 150;  // Update this value
+const unsigned int waterLevelThreshold = 150;
 
+// Returns whether the water level is above a certain threshold
 bool waterLevelOK() {
   return waterLevel >= waterLevelThreshold;
 }
 
 unsigned int humidity = 25;
 
+// Updates the LCD to display the current air temperature and humidity
+// If the water level is too low, the display instead displays
+// "Water level is too low."
 void updateLCD() {
-  // Updates the LCD to display the current air temperature and humidity
-  // If the water level is too low, the display reflects that
   lcd.clear();
   lcd.setCursor(0, 0);
 
@@ -115,6 +122,9 @@ void updateLCD() {
   }
 }
 
+// The state of the circuit is determined by this function
+// as the current state conditionally changes depending
+// on the current inputs from the sensors
 void updateStateMachine() {
   switch (currentState) {
     case 0:  // Disabled
@@ -142,6 +152,8 @@ void updateStateMachine() {
   }
 }
 
+// Prints a state update message with the state of the circuit,
+// the date, and the time
 void printDateTime() {
   rtc.refresh();
 
@@ -154,6 +166,13 @@ void printDateTime() {
   }
 }
 
+// Some parts of the circuit only update once per state change
+// to reduce unnessecary calls and LCD refreshes. Whenever its
+// state changes, it reads the potentiometer's input and
+// updates the angle of the stepper motor if necessary. If the
+// circuit has entered the error mode, the LCD updates.
+// In addition, it calls the function to update the LCD every
+// minute if it's in an appropriate state. 
 void updateFunctionality() {
   readSensorData();
 
@@ -186,9 +205,7 @@ void updateFunctionality() {
   }
 }
 
-/*
- Button Management
-*/
+// Button Management
 void toggleSystemEngaged() {
   if (currentState == 0) {  // Disabled -> Idle
     currentState = 1;
@@ -203,40 +220,10 @@ void toggleSystemEngaged() {
   unsigned char Monitor[] = "0123";
 }
 
-unsigned int foo = 0;
-unsigned int fooLast = 0;
-
-void initializePins() {
-  // Sets     PB5, PB6, PB7, and PB8 to output
-  // Port(s):  10,  11,  12, and  13 to output
-  *ddr_b |= BIT(4);
-  *ddr_b |= BIT(5);
-  *ddr_b |= BIT(6);
-  *ddr_b |= BIT(7);
-
-  // Sets     PD0, PD1 to output
-  // Port(s):  21, 20 to output
-  *ddr_d |= BIT(0);
-  *ddr_d |= BIT(1);
-
-  // Sets     PH3, PH4, PH5
-  // Port(s):   6,   7,   8
-  *ddr_h |= BIT(3);
-  *ddr_h |= BIT(4);
-  *ddr_h |= BIT(5);
-
-  // Sets  PE0, PE1, PE4 to input
-  // Port(s):  0, 1, 2
-  *ddr_e &= ~BIT(4);
-
-  // Sets     PK7 to input
-  // Port(s): A15
-  *ddr_f &= ~BIT(7);
-
-  attachInterrupt(digitalPinToInterrupt(2), toggleSystemEngaged, RISING);
-}
-
+// Manages the state of the LEDs and fan
 void manageOutput() {
+  // Each LED is turned on or off
+  // Only one will ever be on at a time
   for (int i = 0; i < 4; i++) {
     if (i == currentState) {
       // Turn it on
@@ -257,6 +244,8 @@ void manageOutput() {
 unsigned long previousMillis = 0;
 const long interval = 60000;
 
+// Every minute, the LCD is updated with
+// the current temperature and humidity
 void updateLCDClock() {
   unsigned long currentMillis = millis();
 
@@ -267,10 +256,8 @@ void updateLCDClock() {
   }
 }
 
-/*
-  Water Level Sensor Management
-*/
-void adc_init() {  //write your code after each commented line and follow the instruction
+//  Water Level Sensor Management
+void adc_init() {
   // setup the A register
   // set bit   7 to 1 to enable the ADC
   *my_ADCSRA |= (1 << 7);
@@ -323,11 +310,12 @@ unsigned int adc_read(unsigned char adc_channel_num) {
   return val;
 }
 
+// Reads in the data from the sensors
 void readSensorData() {
   waterLevel = adc_read(0);
 
   int chk = DHT.read11(DHT11_PIN);
-
+  
   switch (chk) {
     case DHTLIB_OK:
       break;
@@ -349,14 +337,12 @@ void readSensorData() {
   humidity = DHT.humidity;
 }
 
-/*
- * UART FUNCTIONS
- */
+// UART Functions
 void U0Init(int U0baud) {
   unsigned long FCPU = 16000000;
   unsigned int tbaud;
   tbaud = (FCPU / 16 / U0baud - 1);
-  // Same as (FCPU / (16 * U0baud)) - 1;
+
   *myUCSR0A = 0x20;
   *myUCSR0B = 0x18;
   *myUCSR0C = 0x06;
@@ -375,6 +361,36 @@ void putChar(unsigned char U0pdata) {
   while ((*myUCSR0A & TBE) == 0)
     ;
   *myUDR0 = U0pdata;
+}
+
+// Initializes the appropriate pins to input and output
+void initializePins() {
+  // Sets     PB5, PB6, PB7, and PB8 to output
+  // Port(s):  10,  11,  12, and  13 to output
+  *ddr_b |= BIT(4);
+  *ddr_b |= BIT(5);
+  *ddr_b |= BIT(6);
+  *ddr_b |= BIT(7);
+
+  // Sets     PD0, PD1 to output
+  // Port(s):  21, 20 to output
+  *ddr_d |= BIT(0);
+  *ddr_d |= BIT(1);
+
+  // Sets     PH5 to output
+  // Port(s):   8 to output
+  *ddr_h |= BIT(5);
+
+  // Sets     PE4 to input
+  // Port(s):   2 to input
+  *ddr_e &= ~BIT(4);
+
+  // An interrupt is attached to PE4 (Port 2)
+  attachInterrupt(digitalPinToInterrupt(2), toggleSystemEngaged, RISING);
+
+  // Sets     PF7 to input
+  // Port(s): A7
+  *ddr_f &= ~BIT(7);
 }
 
 void setup() {

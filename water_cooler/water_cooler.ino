@@ -1,4 +1,8 @@
+// CPE 301 Final Project: Swamp Cooler
+// Alex Zorzella, John G. Henkel, Brian Hunt, and Jared Baze
+
 // Images and Video Google Drive Link: https://drive.google.com/drive/folders/1cFaX7M_nOUcK27EAklEaLIqBZCs4sfJD?usp=sharing
+// Technical Document: https://docs.google.com/document/d/1MnegvQWdYwcGvtnNMkRyvDiR0MmGSYa0iBC4kLPaE_0/edit?usp=sharing
 
 // Datasheet: https://ww1.microchip.com/downloads/en/DeviceDoc/Atmel-2549-8-bit-AVR-Microcontroller-ATmega640-1280-1281-2560-2561_datasheet.pdf
 // DHT Library: https://github.com/RobTillaart/DHTlib/blob/master/examples/dht11_test/dht11_test.ino
@@ -292,7 +296,7 @@ unsigned int adc_read(unsigned char adc_channel_num) {
 
   // clear the channel selection bits (MUX 5) hint: it's not in the ADMUX register
   //MUX5 in ADCRSB register
-  *my_ADCSRB &= ~(1 << 3);  //MUX5 is bit 3 (this took too long to find)
+  *my_ADCSRB &= ~(1 << 3);  //MUX5 is bit 3
 
   // set the channel selection bits for channel 0
   *my_ADMUX |= (adc_channel_num & 0x1F);
